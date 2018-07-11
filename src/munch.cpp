@@ -14,7 +14,7 @@ namespace munch{
     cout << "Usage:" << endl;
     cout << "munch [options] [command]" << endl;
     cout << "munch [options] [command] {tags}" << endl;
-    if(!help) return;
+    if(!help) exit(EXIT_FAILURE);
     cout << endl;
     cout << "Commands: " << endl;
     cout << " update\t\t\t" << "update the munch database using files in ." << endl;
@@ -27,32 +27,24 @@ namespace munch{
     exit(EXIT_FAILURE);
   }
 
-  /*To exit munch in an error state.
-    used once options and tags structs have been initialised */
-  void cleanup_and_exit(munch_options* mo)
-  {
-    if(mo != nullptr) delete mo;
-    exit(EXIT_FAILURE);
-  }
-
   /* parses command line options (any argments starting with '-') */
-  munch_options* parse_options(std::vector<std::string>& options)
+  munch_options parse_options(std::vector<std::string>& options)
   {
-    munch_options* mo = new munch_options();
+    munch_options mo {};
     for(auto a: options){
       std::string param {a};
       if(param.find("--database=") == 0)
         if(param.size() >= 12)
-          mo->database = param.substr(11);
+          mo.database = param.substr(11);
         else
-          return nullptr;
+          print_usage_and_exit(false, "Error parsing options");
       else if(param.find("-d=") == 0)
         if(param.size() >= 4)
-          mo->database = param.substr(4);
+          mo.database = param.substr(4);
         else
-          return nullptr;
+          print_usage_and_exit(false, "Error parsing options");
       else
-        return nullptr;
+        print_usage_and_exit(false, "Error: unrecognised option");
     }
     return mo;
   }
@@ -74,9 +66,7 @@ namespace munch{
         else if (command == "search")
           tags.push_back(param);
     }
-    munch_options* options = parse_options(passed_options);
-    if(options == nullptr)
-      print_usage_and_exit(false, "Error parsing options. Use --help for more info");
+    munch_options options = parse_options(passed_options);
     if(command == "update"){
       //update(db);
     }
@@ -87,7 +77,6 @@ namespace munch{
       std::cout << "Command not recognised. Use " << argv[0];
       std::cout << " --help for more info" << std::endl;
     }
-    delete options;
   }
 
 }
