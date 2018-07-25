@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+
 #include <stdlib.h>
 #include "munch.h"
 
@@ -12,13 +13,12 @@ namespace munch{
     if(msg != "")
       cout << msg << endl;
     cout << "Usage:" << endl;
-    cout << "munch [options] [command]" << endl;
-    cout << "munch [options] [command] {tags}" << endl;
+    cout << "munch [options] [command] [tags or files]" << endl;
     if(!help) exit(EXIT_FAILURE);
     cout << endl;
     cout << "Commands: " << endl;
-    cout << " update\t\t\t" << "update the munch database using files in ." << endl;
-    cout << " search {tags}\t\t" << "show notes that match all tags" << endl;
+    cout << " update [files] \t\t\t" << "update the munch database using files" << endl;
+    cout << " search [tags]\t\t" << "show notes that match all tags" << endl;
     cout << endl;
     cout << "Options:" << endl;
     cout << " -d=DB, --database=DB\t" << "use DB rather than ~/munch.sqlite";
@@ -49,11 +49,24 @@ namespace munch{
     return mo;
   }
 
+  void add_file(std::string database_path, std::string file_path) { }
+
+  void create_database(std::string path) { }
+
+  /* updates the munch database with the specified files */
+  void update_database(std::string db, std::vector<std::string> files)
+  {
+    /* check to see if database exists */
+
+    if(files.empty())
+      print_usage_and_exit(false, "No files specified");
+  }
+
   int main(int argc, char* argv[])
   {
     std::string command = "";
     std::vector<std::string> passed_options {};
-    std::vector<std::string> tags {};
+    std::vector<std::string> args {};
     for(auto i=1; i<argc; ++i){
       std::string param {argv[i]};
       if((param == "-h") || (param == "--help"))
@@ -63,12 +76,12 @@ namespace munch{
       else
         if(command == "")
           command = param;
-        else if (command == "search")
-          tags.push_back(param);
+        else if ((command == "search") || (command == "update"))
+          args.push_back(param);
     }
     munch_options options = parse_options(passed_options);
     if(command == "update"){
-      //update(db);
+      update_database(options.database, args);
     }
     else if (command == "search"){
       //search(db, tags);
