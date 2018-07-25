@@ -3,7 +3,7 @@
 namespace munch{
   /* Holds options parsed from command line arguments */
   struct munch_options {
-    std::string database = "~/munch.sqlite3";
+    std::string database = "munch.sqlite3";
   };
 }
 #endif

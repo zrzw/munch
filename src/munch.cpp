@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
-
 #include <stdlib.h>
+#include <sqlite3.h>
 #include "munch.h"
 
 namespace munch{
@@ -17,11 +17,12 @@ namespace munch{
     if(!help) exit(EXIT_FAILURE);
     cout << endl;
     cout << "Commands: " << endl;
-    cout << " update [files] \t\t\t" << "update the munch database using files" << endl;
+    cout << " update [files]\t\t";
+    cout << "update the munch database using files" << endl;
     cout << " search [tags]\t\t" << "show notes that match all tags" << endl;
     cout << endl;
     cout << "Options:" << endl;
-    cout << " -d=DB, --database=DB\t" << "use DB rather than ~/munch.sqlite";
+    cout << " -d=DB, --database=DB\t" << "use DB rather than munch.sqlite3";
     cout << endl;
     cout << " -h, --help\t\t" << "show help and exit" << endl;
     exit(EXIT_FAILURE);
@@ -40,7 +41,7 @@ namespace munch{
           print_usage_and_exit(false, "Error parsing options");
       else if(param.find("-d=") == 0)
         if(param.size() >= 4)
-          mo.database = param.substr(4);
+          mo.database = param.substr(3);
         else
           print_usage_and_exit(false, "Error parsing options");
       else
@@ -51,15 +52,18 @@ namespace munch{
 
   void add_file(std::string database_path, std::string file_path) { }
 
-  void create_database(std::string path) { }
-
   /* updates the munch database with the specified files */
-  void update_database(std::string db, std::vector<std::string> files)
+  void update_database(std::string db_path, std::vector<std::string> files)
   {
     /* check to see if database exists */
-
+    sqlite3 *db;
+    int rc = sqlite3_open(db_path.c_str(), &db);
+    if(rc)
+      print_usage_and_exit(false, "Error opening database");
     if(files.empty())
       print_usage_and_exit(false, "No files specified");
+    //TODO open then call add_file for each file
+    sqlite3_close(db);
   }
 
   int main(int argc, char* argv[])
@@ -70,7 +74,7 @@ namespace munch{
     for(auto i=1; i<argc; ++i){
       std::string param {argv[i]};
       if((param == "-h") || (param == "--help"))
-        munch::print_usage_and_exit(true);
+        print_usage_and_exit(true);
       if(param.at(0) == '-')
           passed_options.push_back(param);
       else
@@ -90,6 +94,7 @@ namespace munch{
       std::cout << "Command not recognised. Use " << argv[0];
       std::cout << " --help for more info" << std::endl;
     }
+    return 0;
   }
 
 }
