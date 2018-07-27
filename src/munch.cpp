@@ -97,6 +97,42 @@ namespace munch{
         return 0;
     }
 
+    /* prepare an insert or replace statement for execution
+       on a (id, text) or (id, text, num) table */
+    void construct_insert_stmt(std::string& res, std::string verb, std::string table,
+                               int id, std::string text_field, int num_field=0)
+    {
+        res = verb;
+        res += " INTO ";
+        res += table;
+        res += " VALUES(";
+        char num[32];
+        snprintf(num, 31, "%d", id);
+        res += num;
+        res += ", \"";
+        res += text_field;
+        if(num_field != 0){
+            res += "\",";
+            snprintf(num, 31, "%d", num_field);
+            res += num;
+            res += ") ";
+        }
+        else {
+            res += "\")";
+        }
+    }
+
+    /* if SQL stmt does not execute correctly, the program will end */
+    void exec_guard(int rc, char** err, sqlite3 *db)
+    {
+        if(rc != SQLITE_OK){
+            std::cout << "sqlite3: " << err << std::endl;
+            sqlite3_free(err);
+            sqlite3_close(db);
+            print_usage_and_exit(false, "SQL error");
+        }
+    }
+
     /* updates the database with the specified files */
     void update_database(std::string db_path, std::vector<std::string> files)
     {
@@ -111,49 +147,31 @@ namespace munch{
             sqlite3_close(db);
             print_usage_and_exit(false, "No files specified");
         }
-        using std::string;
         for(auto f: files){
-            string contents;
-            std::vector<string> tags {};
+            std::string contents;
+            std::vector<std::string> tags {};
             auto id = parse_file(f, tags, contents);
-            string stmt =
+            std::string stmt =
                 "CREATE TABLE IF NOT EXISTS "
                 "notes(id INTEGER PRIMARY KEY, note TEXT)";
             char *err = 0;
             query_results qr;
-            rc = sqlite3_exec(db, stmt.c_str(), callback, &qr, &err);
-            if(rc != SQLITE_OK){
-                std::cout << "sqlite3: " << err << std::endl;
-                sqlite3_free(err);
-                print_usage_and_exit(false, "SQL error");
-            }
+            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, &qr, &err), &err, db);
+            auto note_id = 0;
             if(id <= 0){
                 // creating a new note (0= error parsing id with atoi()
                 stmt = "SELECT MAX(id) FROM notes";
-                rc = sqlite3_exec(db, stmt.c_str(), callback, &qr, &err);
-                if(rc != SQLITE_OK){
-                    std::cout << "sqlite3: " << err << std::endl;
-                    sqlite3_free(err);
-                    print_usage_and_exit(false, "SQL error");
-                }
-                stmt = "INSERT INTO notes VALUES(";
-                char new_id[32];
-                snprintf(new_id, 31, "%d", qr.id + 1);
-                stmt += new_id;
-                stmt += ", \"";
-                stmt += contents;
-                stmt += "\")";
-                rc = sqlite3_exec(db, stmt.c_str(), callback, &qr, &err);
-                if(rc != SQLITE_OK){
-                    std::cout << "sqlite3: " << err << std::endl;
-                    sqlite3_free(err);
-                    print_usage_and_exit(false, "SQL error");
-                }
+                exec_guard(sqlite3_exec(db, stmt.c_str(), callback, &qr, &err), &err, db);
+                note_id = qr.id+1;
+                construct_insert_stmt(stmt, "INSERT", "notes", note_id, contents);
             }
             else {
-                // updating an existing note
+                //update an existing note
+                note_id = id;
+                construct_insert_stmt(stmt, "REPLACE", "notes", note_id, contents);
             }
-
+            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, &qr, &err), &err, db);
+            //TODO: update tags
         }
         sqlite3_close(db);
     }
