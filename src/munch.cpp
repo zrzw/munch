@@ -85,7 +85,10 @@ namespace munch{
         query_results *qr= (query_results*)res;
         for(auto i=0; i<argc; ++i){
             if((strcmp(col[i], "id") == 0) || (strcmp(col[i], "MAX(id)") == 0)){
-                qr->id = atoi(argv[i]);
+                if(argv[i] == nullptr)
+                    qr->id = 0;
+                else
+                    qr->id = atoi(argv[i]);
             }
             else if (strcmp(col[i], "note") == 0){
                 qr->note = std::string(argv[i]);
@@ -98,7 +101,7 @@ namespace munch{
     }
 
     /* prepare an insert or replace statement for execution
-       on a (id, text) or (id, text, num) table */
+       on a ([id,] text) or ([id,] text, num) table */
     void construct_insert_stmt(std::string& res, std::string verb, std::string table,
                                int id, std::string text_field, int num_field=0)
     {
@@ -106,13 +109,19 @@ namespace munch{
         res += " INTO ";
         res += table;
         res += " VALUES(";
-        char num[32];
-        snprintf(num, 31, "%d", id);
-        res += num;
-        res += ", \"";
+        if(id > 0){
+            char num[32];
+            snprintf(num, 31, "%d", id);
+            res += num;
+            res += ", \"";
+        }
+        else {
+            res += "\"";
+        }
         res += text_field;
         if(num_field != 0){
             res += "\",";
+            char num[32];
             snprintf(num, 31, "%d", num_field);
             res += num;
             res += ") ";
@@ -138,8 +147,7 @@ namespace munch{
     {
         /* check to see if database exists */
         sqlite3 *db;
-        auto rc = sqlite3_open(db_path.c_str(), &db);
-        if(rc){
+        if(sqlite3_open(db_path.c_str(), &db)){
             sqlite3_close(db);
             print_usage_and_exit(false, "Error opening database");
         }
@@ -156,7 +164,7 @@ namespace munch{
                 "notes(id INTEGER PRIMARY KEY, note TEXT)";
             char *err = 0;
             query_results qr;
-            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, &qr, &err), &err, db);
+            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
             auto note_id = 0;
             if(id <= 0){
                 // creating a new note (0= error parsing id with atoi()
@@ -170,8 +178,15 @@ namespace munch{
                 note_id = id;
                 construct_insert_stmt(stmt, "REPLACE", "notes", note_id, contents);
             }
-            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, &qr, &err), &err, db);
-            //TODO: update tags
+            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
+            stmt =
+                "CREATE TABLE IF NOT EXISTS "
+                "tags(tag TEXT, ptr INTEGER)";
+            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
+            for(auto t: tags){
+                construct_insert_stmt(stmt, "INSERT", "tags", -1, t, note_id);
+                exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
+            }
         }
         sqlite3_close(db);
     }
