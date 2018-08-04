@@ -8,7 +8,8 @@ namespace munch{
 
     struct query_results {
         int id = 0;
-        std::string note = "";
+        std::string text = "";
+        std::vector<int> search_results {};
     };
 }
 #endif

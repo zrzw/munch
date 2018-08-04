@@ -4,11 +4,15 @@
 #include <stdlib.h>
 #include <cstring>
 #include <sqlite3.h>
+#include <map>
 #include "munch.h"
 
-namespace munch{
 
-    void print_usage_and_exit(bool help, std::string msg="")
+namespace munch{
+    using std::string;
+    using std::vector;
+
+    void print_usage_and_exit(bool help, string msg="")
     {
         using std::cout;
         using std::endl;
@@ -33,11 +37,11 @@ namespace munch{
     }
 
     /* parses command line options (any argments starting with '-') */
-    munch_options parse_options(std::vector<std::string>& options)
+    munch_options parse_options(vector<string>& options)
     {
         munch_options mo {};
         for(auto a: options){
-            std::string param {a};
+            string param {a};
             if(param.find("--database=") == 0)
                 if(param.size() >= 12)
                     mo.database = param.substr(11);
@@ -55,13 +59,13 @@ namespace munch{
     }
 
     /* read a file's contents, tags and id if there is one */
-    int parse_file(std::string f, std::vector<std::string>& tags,
-                   std::string& contents)
+    int parse_file(string f, vector<string>& tags,
+                   string& contents)
     {
         std::ifstream file (f);
         if(!file.is_open())
             print_usage_and_exit(false, "failed to open given file");
-        std::string line;
+        string line;
         int id=-1;
         bool first_line = true;
         while(getline(file, line)){
@@ -84,14 +88,17 @@ namespace munch{
     {
         query_results *qr= (query_results*)res;
         for(auto i=0; i<argc; ++i){
-            if((strcmp(col[i], "id") == 0) || (strcmp(col[i], "MAX(id)") == 0)){
+            if((strcmp(col[i],"id") == 0)||(strcmp(col[i],"MAX(id)") == 0)){
                 if(argv[i] == nullptr)
                     qr->id = 0;
                 else
                     qr->id = atoi(argv[i]);
             }
             else if (strcmp(col[i], "note") == 0){
-                qr->note = std::string(argv[i]);
+                qr->text = string(argv[i]);
+            }
+            else if (strcmp(col[i], "ptr") == 0){
+                qr->search_results.push_back(atoi(argv[i]));
             }
             else {
                 print_usage_and_exit(false, col[i]);
@@ -102,8 +109,9 @@ namespace munch{
 
     /* prepare an insert or replace statement for execution
        on a ([id,] text) or ([id,] text, num) table */
-    void construct_insert_stmt(std::string& res, std::string verb, std::string table,
-                               int id, std::string text_field, int num_field=0)
+    void construct_insert(string& res, string verb,
+                               string table, int id,
+                               string text_field, int num_field=0)
     {
         res = verb;
         res += " INTO ";
@@ -132,18 +140,59 @@ namespace munch{
     }
 
     /* if SQL stmt does not execute correctly, the program will end */
-    void exec_guard(int rc, char** err, sqlite3 *db)
+    void sqlite3_exec_guard(sqlite3 *db, string stmt,
+                            int (*callback) (void*,int,char**,char**),
+                            void* res, char** err)
     {
+        int rc = sqlite3_exec(db, stmt.c_str(), callback, res, err);
         if(rc != SQLITE_OK){
-            std::cout << "sqlite3: " << err << std::endl;
-            sqlite3_free(err);
+            std::cout << "sqlite3 error: " << *err << std::endl;
+            sqlite3_free(*err);
             sqlite3_close(db);
             print_usage_and_exit(false, "SQL error");
         }
     }
 
+    /* searches the database for a union match of the specified tags */
+    vector<int> search(string db_path,
+                            vector<string> tags)
+    {
+        /* check to see if database exists */
+        sqlite3 *db;
+        char *err=0;
+        if(sqlite3_open(db_path.c_str(), &db)){
+            sqlite3_close(db);
+            print_usage_and_exit(false, "Error opening database");
+        }
+        const string base_stmt = "SELECT ptr from tags WHERE tag='";
+        const string quote = "'";
+        std::map<int,int> results {};
+        auto n = 0;
+        for(auto t: tags){
+            string stmt = base_stmt + t + quote;
+            query_results qr;
+            sqlite3_exec_guard(db, stmt.c_str(), callback, &qr, &err);
+            for(auto id: qr.search_results){
+                if(results.find(id) == results.end())
+                    results[id] = 1;
+                else
+                    results[id] = results[id] + 1;
+            }
+            n++;
+        }
+        vector<int> ids {};
+        for(auto& pair: results){
+            if(pair.second == n){
+                ids.push_back(pair.first);
+            }
+        }
+        sqlite3_close(db);
+        return ids;
+    }
+
     /* updates the database with the specified files */
-    void update_database(std::string db_path, std::vector<std::string> files)
+    void update_database(string db_path,
+                         vector<string> files)
     {
         /* check to see if database exists */
         sqlite3 *db;
@@ -156,48 +205,48 @@ namespace munch{
             print_usage_and_exit(false, "No files specified");
         }
         for(auto f: files){
-            std::string contents;
-            std::vector<std::string> tags {};
+            string contents;
+            vector<string> tags {};
             auto id = parse_file(f, tags, contents);
-            std::string stmt =
+            string stmt =
                 "CREATE TABLE IF NOT EXISTS "
                 "notes(id INTEGER PRIMARY KEY, note TEXT)";
             char *err = 0;
             query_results qr;
-            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
+            sqlite3_exec_guard(db, stmt.c_str(), callback, nullptr, &err);
             auto note_id = 0;
             if(id <= 0){
                 // creating a new note (0= error parsing id with atoi()
                 stmt = "SELECT MAX(id) FROM notes";
-                exec_guard(sqlite3_exec(db, stmt.c_str(), callback, &qr, &err), &err, db);
+                sqlite3_exec_guard(db, stmt.c_str(), callback, &qr, &err);
                 note_id = qr.id+1;
-                construct_insert_stmt(stmt, "INSERT", "notes", note_id, contents);
+                construct_insert(stmt, "INSERT", "notes", note_id, contents);
             }
             else {
                 //update an existing note
                 note_id = id;
-                construct_insert_stmt(stmt, "REPLACE", "notes", note_id, contents);
+                construct_insert(stmt,"REPLACE", "notes", note_id, contents);
             }
-            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
+            sqlite3_exec_guard(db, stmt.c_str(), callback, nullptr, &err);
             stmt =
                 "CREATE TABLE IF NOT EXISTS "
                 "tags(tag TEXT, ptr INTEGER)";
-            exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
+            sqlite3_exec_guard(db, stmt.c_str(), callback, nullptr, &err);
             for(auto t: tags){
-                construct_insert_stmt(stmt, "INSERT", "tags", -1, t, note_id);
-                exec_guard(sqlite3_exec(db, stmt.c_str(), callback, nullptr, &err), &err, db);
+                construct_insert(stmt, "INSERT", "tags", -1, t, note_id);
+                sqlite3_exec_guard(db, stmt.c_str(), callback,nullptr, &err);
             }
         }
         sqlite3_close(db);
     }
 
-    int main(int argc, char* argv[])
+    int entry(int argc, char* argv[])
     {
-        std::string command = "";
-        std::vector<std::string> passed_options {};
-        std::vector<std::string> args {};
+        string command = "";
+        vector<string> passed_options {};
+        vector<string> args {};
         for(auto i=1; i<argc; ++i){
-            std::string param {argv[i]};
+            string param {argv[i]};
             if((param == "-h") || (param == "--help"))
                 print_usage_and_exit(true);
             if(param.at(0) == '-')
@@ -213,7 +262,9 @@ namespace munch{
             update_database(options.database, args);
         }
         else if (command == "search"){
-            //search(db, tags);
+            vector<int> results(search(options.database, args));
+            for(auto r: results)
+                std::cout << r;
         }
         else{
             std::cout << "Command not recognised. Use " << argv[0];
@@ -229,5 +280,5 @@ int main(int argc, char* argv[])
     if(argc < 2){
         munch::print_usage_and_exit(false, "Error: not enough args");
     }
-    munch::main(argc, argv);
+    munch::entry(argc, argv);
 }
