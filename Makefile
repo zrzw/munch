@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 CC = g++ -Wall -std=c++14
-LIBS = /usr/local/lib/libsqlite3.so
+LIBS = /usr/lib/x86_64-linux-gnu/libsqlite3.so
 
 munch: munch.o
 	$(CC) -o munch munch.o $(LIBS)
