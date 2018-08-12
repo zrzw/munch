@@ -5,12 +5,12 @@
 #include <cstring>
 #include <sqlite3.h>
 #include <map>
-#include "munch.h"
+#include "munch.hpp"
 
+using std::string;
+using std::vector;
 
 namespace munch{
-    using std::string;
-    using std::vector;
 
     void print_usage_and_exit(bool help, string msg="")
     {
@@ -110,8 +110,8 @@ namespace munch{
     /* prepare an insert or replace statement for execution
        on a ([id,] text) or ([id,] text, num) table */
     void construct_insert(string& res, string verb,
-                               string table, int id,
-                               string text_field, int num_field=0)
+                          string table, int id,
+                          string text_field, int num_field=0)
     {
         res = verb;
         res += " INTO ";
