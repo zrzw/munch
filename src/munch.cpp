@@ -96,7 +96,7 @@ int munch::entry(int argc, char* argv[])
 	else if (command == "search"){
 		std::vector<int> results(search(db, args));
 		for(auto r: results)
-			std::cout << r;
+			display_note(db, r);
 	}
 	else{
 		std::cout << "Command not recognised. Use " << argv[0];

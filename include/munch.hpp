@@ -15,6 +15,7 @@ namespace munch {
 		int id = 0;
 		std::string text = "";
 		std::vector<int> search_results {};
+		std::vector<std::string> tag_list {};
 	};
 	std::vector<int> search(sqlite3* db, std::vector<std::string> tags);
 	void update_database(sqlite3* db, std::vector<std::string> files);
@@ -24,13 +25,17 @@ namespace munch {
 	void create_notes_table(sqlite3 *db);
 	void create_tags_table(sqlite3 *db);
 	int get_max_note_id(sqlite3 *db);
+	std::vector<std::string> get_tags(sqlite3* db, int id);
+	std::string get_note(sqlite3* db, int id);
 	int callback(void *res, int argc, char** argv, char** col);
-	void construct_insert(std::string& res, std::string verb, std::string table, int id, std::string text_field,int num_field=0);
-	void sqlite3_exec_guard(sqlite3 *db, std::string stmt, int (*callback) (void*,int,char**,char**), void* res, char** err);
+	void construct_insert(std::string& res, std::string verb, std::string table,
+						  int id, std::string text_field,int num_field=0);
+	void sqlite3_exec_guard(sqlite3 *db, std::string stmt,
+							int (*callback) (void*,int,char**,char**), void* res, char** err);
 	munch_options parse_options(std::vector<std::string>& options);
 	void print_usage_and_exit(bool help, std::string msg="");
 	void print_error_and_exit(std::string msg="");
-	void display_note(std::string db_path, int note_id);
+	void display_note(sqlite3* db, int note_id);
 	int parse_file(std::string f, std::vector<std::string>& tags,
 				   std::string& contents);
 }

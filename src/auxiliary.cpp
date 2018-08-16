@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <sqlite3.h>
 #include "munch.hpp"
 
 using namespace munch;
@@ -34,38 +35,54 @@ munch::munch_options munch::parse_options(std::vector<std::string>& options)
 
 void munch::print_usage_and_exit(bool help, std::string msg)
 {
-		using std::cout;
-		using std::endl;
-		if(msg != "")
-			cout << msg << endl;
-		cout << "Usage:" << endl;
-		cout << "munch [options] [command] [tags or files]" << endl;
-		if(!help) exit(EXIT_FAILURE);
-		cout << endl;
-		cout << "Commands: " << endl;
-		cout << " update [files]\t\t";
-		cout << "update the munch database using files" << endl;
-		cout << " search [tags]\t\t"
-			 << "show notes that match all tags" << endl;
-		cout << endl;
-		cout << "Options:" << endl;
-		cout << " -d=DB, --database=DB\t"
-			 << "use DB rather than munch.sqlite3";
-		cout << endl;
-		cout << " -h, --help\t\t" << "show help and exit" << endl;
-		exit(EXIT_FAILURE);
+	using std::cout;
+	using std::endl;
+	if(msg != "")
+		cout << msg << endl;
+	cout << "Usage:" << endl;
+	cout << "munch [options] [command] [tags or files]" << endl;
+	if(!help) exit(EXIT_FAILURE);
+	cout << endl;
+	cout << "Commands: " << endl;
+	cout << " update [files]\t\t";
+	cout << "update the munch database using files" << endl;
+	cout << " search [tags]\t\t"
+		 << "show notes that match all tags" << endl;
+	cout << endl;
+	cout << "Options:" << endl;
+	cout << " -d=DB, --database=DB\t"
+		 << "use DB rather than munch.sqlite3";
+	cout << endl;
+	cout << " -h, --help\t\t" << "show help and exit" << endl;
+	exit(EXIT_FAILURE);
 }
 
 void munch::print_error_and_exit(std::string msg)
 {
-		if(msg != "")
-			std::cout << "Error: " << msg << std::endl;
-		exit(EXIT_FAILURE);
+	if(msg != "")
+		std::cout << "Error: " << msg << std::endl;
+	exit(EXIT_FAILURE);
 }
 
-void munch::display_note(std::string db_path, int note_id)
+void munch::display_note(sqlite3* db, int note_id)
 {
-	
+	std::cout << "%" << note_id << std::endl;
+	std::vector<std::string> tags = get_tags(db, note_id);
+	for(auto& t : tags)
+		std::cout << "#" << t << std::endl;
+	std::string note_string = get_note(db, note_id);
+	size_t start=0, current=0;
+	for(; current<note_string.size(); ++current){
+		if (note_string[current] == 'n')
+			if (note_string[current-1] == '\\'){
+				std::cout << note_string.substr(start, current-start-1);
+				std::cout << std::endl;
+				start = current + 1;
+				continue;
+			}
+	}
+	if(start < current)
+		std::cout << note_string.substr(start, current-start);
 }
 
 /* read a file's contents, tags and id if there is one */

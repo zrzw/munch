@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sqlite3.h>
 #include <cstring>
+#include <stdlib.h>
 #include "munch.hpp"
 
 using namespace munch;
@@ -54,6 +55,8 @@ int munch::callback(void *res, int argc, char** argv, char** col)
 {
 	query_results *qr= (query_results*)res;
 	for(auto i=0; i<argc; ++i){
+		/* populate the query_results 'enum' depending
+		   on the type of query */
 		if((strcmp(col[i],"id") == 0)||(strcmp(col[i],"MAX(id)") == 0)){
 			if(argv[i] == nullptr)
 				qr->id = 0;
@@ -66,11 +69,42 @@ int munch::callback(void *res, int argc, char** argv, char** col)
 		else if (strcmp(col[i], "ptr") == 0){
 			qr->search_results.push_back(atoi(argv[i]));
 		}
+		else if (strcmp(col[i], "tag") == 0){
+			qr->tag_list.push_back(argv[i]);
+		}
 		else {
 			print_usage_and_exit(false, col[i]);
 		}
 	}
 	return 0;
+}
+
+/* get a list of all tags which are linked to 'id' */
+std::vector<std::string> munch::get_tags(sqlite3* db, int id)
+{
+	query_results qr;
+	char *err=0;
+	const size_t SZ = 8;
+	char id_str[SZ];
+	snprintf(id_str, SZ, "%d", id);
+	std::string stmt {"SELECT tag FROM tags WHERE ptr == "};
+	stmt.append(id_str);
+	sqlite3_exec_guard(db, stmt, callback, &qr, &err);
+	return qr.tag_list;
+}
+
+/* get the note with the specified id */
+std::string munch::get_note(sqlite3* db, int id)
+{
+	query_results qr;
+	char *err = 0;
+	const size_t SZ = 8;
+	char id_str[SZ];
+	snprintf(id_str, SZ, "%d", id);
+	std::string stmt {"SELECT note FROM notes WHERE id == "};
+	stmt.append(id_str);
+	sqlite3_exec_guard(db, stmt, callback, &qr, &err);
+	return qr.text;
 }
 
 /* prepare an insert or replace statement for execution on the notes or tags table */
