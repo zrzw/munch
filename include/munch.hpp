@@ -1,6 +1,6 @@
 #ifndef MUNCH_HPP_
 #define MUNCH_HPP_
-
+#include <iostream>
 #include <vector>
 #include <sqlite3.h>
 
