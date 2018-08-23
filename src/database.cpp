@@ -36,7 +36,7 @@ void munch::create_tags_table(sqlite3 *db)
 {
 	std::string stmt =
 			"CREATE TABLE IF NOT EXISTS "
-			"notes(id INTEGER PRIMARY KEY, note TEXT)";
+			"tags(tag TEXT, ptr INTEGER)";
 	char *err = 0;
 	sqlite3_exec_guard(db, stmt.c_str(), callback, nullptr, &err);
 }

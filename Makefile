@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-CC = g++ -Wall -g -std=c++14
+CC = clang++ -Wall -g -std=c++14
 LIBS = /usr/lib/x86_64-linux-gnu/libsqlite3.so
 INCLUDE = ./include
 INSTALL = install
